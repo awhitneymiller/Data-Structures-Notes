@@ -41,6 +41,7 @@ These banks consist of contiguous blocks of bytes organized in a sequential addr
 Different computers will gave different byte-grouping styles depending on its hardware.
 
 **Words & Word-Size**
+=====================
 `A word is an architecture-dependent number of bytes that represents the maximum number of bits that it can process at one time.`
 
 The word-size is the number of bytes in one word per system
@@ -95,3 +96,130 @@ What happens when we try to access x[2]?
 2. Index 2 will be exactly 2 cells past index 0
 3. So to find index 3, we'd  go to the memory address 0056.
 Once the computer jumps to the memory address 0056, it returns the value, which is 3.
+
+**Garbage Collection**
+======================
+Since memory is finite, we want a way to free memory that is no longer being used  
+`Garbage collection is the process by which memory reserved for garbage (i.e., variables and objects that are never going to be used again in our code) is freed.`  
+
+Python has a garbage collector, unlike C/C++  
+
+To understand the Python garbage collector, we need to understand a bit about he lifespan of variables. 
+***What is a Local Variable?:***
+    *Local Variables exist only in their defined scope. When a programs control flow leaves that scope (e.g. returning from a function) the memory allocayed for those local variables is freed.*
+
+`Garbage collection for local variables is quite simple: allocate the memory when declared, keep it as long as it is in scope, then deallocate when it is out of scope.`
+
+For this reason, local variables are allocated in a special area of memory called `the stack` (since we push and pop scopes from the stack as well as each scope's associated local variables). Essentially, each time a new scope (like a function or a loop) is entered, the local variables for that scope are pushed onto the stack. When the scope ends, those variables are popped off, freeing up the memory.
+
+**Stacks**
+==========
+
+The `Call Stack` determines what values of which variables are stored in which `Stack Frames`, containing all of the local variables belonding to a particular function call.
+
+A `Stack Frame` is a section of the stack that holds information about a single function or method call. 
+    - When a function is called, a new stack frame is created and pushed onto the stack. When the function finishes, its stack frame is popped off, and execution continues from the return address. This process is critical for managing function calls and local variable lifetimes in a program.
+***Example***
+```python
+def g(p: int) -> int:
+    return p + 2
+
+def f(p: int) -> int:
+    p = g(p)
+    return p * 2
+
+p: int = 2
+p = f(p)
+print (p)
+```
+![call stack diagram](image-7.png)
+
+***Notes on the above:***
+    - Although each parameter of f, g have the same name p, they each reserve their own memory for it in their respective stack frames.
+    -Each time a method is called, it generates a new stack frame atop the one that called it; this is how we know where to return control flow after a method returns.
+    -When a method returns, whatever local variables were allocated to it in its stack frame (which includes parameters) are also freed.
+
+**Heaps**
+=========
+Local variables are great for storing small pieces of data like counters or flags. But when we need to store larger data (like big objects), it becomes a problem. Allocating memory for large objects can take up a lot of resources, so we want to avoid doing it too often.
+
+To handle this, we use heap allocation and references:
+
+In Python, large objects are stored in a part of memory called the heap. The heap is just a special area of memory where objects go when they need more space than a local variable can offer.
+
+Each object in the heap is accessed using a reference, which is simply a memory address pointing to where the object is located.
+
+So, when you create an object, memory is allocated for that object in the heap, and the variable you use to hold it stores the reference (the memory address) to that object, not the object itself.
+
+***Example***
+```python
+locVar: int = 5
+heapVar: Classy = Classy()
+```
+![Stack to heap image](image-8.png)
+
+***Things to note about the above:***
+    - The locVar local int is stored directly in the stack. It will remain there until it is popped from the stack 
+        (i.e., falls permanently out of scope).
+    - The Classy object (i.e., any non-primitive) is stored in the heap, but its `reference` is stored in the stack and is called heapVar.
+    - The Classy object will remain in the heap until no references point to it. The local reference heapVar will stay in the stack until it is popped.
+
+**Deallocation in Python**
+==========================
+When an object is created in python, the compiler also creates a reference count for it. This increments for each new reference.
+***example:***
+The list below wpild have a reference count of 2.
+```python
+a: list = [1, 2, 3]
+b: list = a
+```
+
+When an object is dereferenced, (like doing this: a = None), the reference count is decremented. Once the reference count is 0, the memory for the object is garbage collected.
+
+**Reference Mechanics**
+=======================
+Referencing can get a bit overwhelming if not diagramed.
+`Object references can be set and compared to None, eg, b: Burnymon = None and if b == None:.`
+`If we create a variable and don't assign it, then if we try to access it we'll get a NameError.
+```python
+b: Burnymon
+b.get_health()
+# NameError: name 'b' is not defined
+```
+**Reference Assignment**
+========================
+`References can be copied just by using the assignment operator (=), which also happens when references are passed as arguments to functions (the parameters are assigned the same references as the argument).`
+This has the effect of simply storing the memory location of the object in the heap within multiple local reference variables; pictorially, we have:
+```python
+    burny: Burnymon = Burnymon("Dave")
+    burny2: Burnymon = burny
+```
+![multiple references diagram](image-9.png)
+
+Things to Note:
+    -burny and burny2 are both references that point to the same Burnymon object in memory. This means that if I call burny.take_damage(...);, that damage taken will be manifest if I were to call burny2.get_health();
+    -Importantly, assigning one reference to another does not make a copy of that object.
+    -The Burnymon object in the heap will only be deallocated when BOTH burny and burny2 references are deallocated.
+    - Note: when we draw the above, and we see that burny and burny2 point to the same object in the heap, then we know that burny is burny2 => true! This is how we can think about the identity equivalence check described in the last lecture, which can be answered visually: if two references point to the same object in memory, they would be identity equivalent.
+
+Heap Allocation with references is useful for a variety of reasons:
+    -We can decide the lifetime of an object, rather than have it necessarily be deallocated when popped from the stack.
+    -This allows us to also pass the same object between methods so that its state can be modified by them needing to only reference the parameter.
+
+**Passing Assignments**
+=======================
+When arguments are sent to functions, a new reference to the object is being sent to the function: but the parameter in the function is fundamentally still a reference to the same object, although a new variable is created in the parameters that refer to it.
+***example***
+```python
+def add_number(x: list, y: int) -> None:
+    x.append(y)
+
+new_list = [1, 2, 3]
+add_number(new_list, 4)
+print(new_list)
+```
+While a new variable x was made in add_number, it fundamentally refers to the same object in memory. This kind of behavior is important to remember if you want to pass an object into a method or function but you don't want the edits within the function to affect the original object. To do this we make a deep copy, which we'll cover later.
+
+**A Note on Immutable Types**
+=============================
+While integers, strings, and tuples are still passed by assignment/reference, their immutability prevents them from being able to be affected like mutable objects.
